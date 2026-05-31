@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.tools"
+PHAR_PATH="${TOOLS_DIR}/php-cs-fixer-v3.84.0.phar"
+PHP_CS_FIXER_URL="https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/releases/download/v3.84.0/php-cs-fixer.phar"
+
+mkdir -p "${TOOLS_DIR}"
+
+if [[ ! -f "${PHAR_PATH}" ]]; then
+    exec 9>"${TOOLS_DIR}/php-cs-fixer.lock"
+    flock 9
+    if [[ ! -f "${PHAR_PATH}" ]]; then
+        tmp_file="${PHAR_PATH}.tmp.$$"
+        curl -fsSL "${PHP_CS_FIXER_URL}" -o "${tmp_file}"
+        mv "${tmp_file}" "${PHAR_PATH}"
+        chmod +x "${PHAR_PATH}"
+    fi
+fi
+
+exec php "${PHAR_PATH}" "$@"

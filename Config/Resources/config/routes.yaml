@@ -1,0 +1,4 @@
+smart_mailer_router_admin:
+  resource: '../../../UI/Controller/Admin/'
+  type: attribute
+

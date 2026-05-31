@@ -1,0 +1,67 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  _instanceof:
+    MauticPlugin\SmartMailerRouterBundle\Domain\Routing\Contract\ModeRoutingStrategyInterface:
+      tags: ['smart_mailer_router.mode_strategy']
+    MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\ProviderAdapterInterface:
+      tags: ['smart_mailer_router.provider_adapter']
+
+  MauticPlugin\SmartMailerRouterBundle\Config\:
+    resource: '../../../Config/'
+    exclude:
+      - '../../../Config/config.php'
+      - '../../../Config/services.php'
+
+  MauticPlugin\SmartMailerRouterBundle\Application\:
+    resource: '../../../Application/'
+
+  MauticPlugin\SmartMailerRouterBundle\Command\:
+    resource: '../../../Command/'
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Routing\Strategy\:
+    resource: '../../../Domain/Routing/Strategy/'
+
+  MauticPlugin\SmartMailerRouterBundle\Infrastructure\:
+    resource: '../../../Infrastructure/'
+
+  MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SchemaInitializer:
+    public: true
+
+  MauticPlugin\SmartMailerRouterBundle\UI\:
+    resource: '../../../UI/'
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\ProviderGuardInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Application\Provider\ProviderGuard
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\ProviderAdapterFactoryInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Application\Provider\ProviderAdapterFactory
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\ProviderHealthRepositoryInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Infrastructure\Cache\InMemoryProviderHealthRepository
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\RetryPolicyInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Application\Health\ExponentialBackoffRetryPolicy
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Routing\Contract\JsonDslEvaluatorInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Application\Routing\VersionedJsonDslEvaluator
+
+  MauticPlugin\SmartMailerRouterBundle\Domain\Routing\Contract\RoutingDecisionCacheInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Infrastructure\Cache\InMemoryRoutingDecisionCache
+
+  MauticPlugin\SmartMailerRouterBundle\Application\Provider\ProviderAdapterFactory:
+    arguments:
+      $adapters: !tagged_iterator smart_mailer_router.provider_adapter
+
+  MauticPlugin\SmartMailerRouterBundle\Application\Routing\ModeRoutingStrategyFactory:
+    arguments:
+      $strategies: !tagged_iterator smart_mailer_router.mode_strategy
+
+  MauticPlugin\SmartMailerRouterBundle\Config\Queue\QueueNames:
+    arguments:
+      $routing: '%smart_mailer_router.queues.routing%'
+      $warmup: '%smart_mailer_router.queues.warmup%'
+      $logs: '%smart_mailer_router.queues.logs%'
+      $deadLetter: '%smart_mailer_router.queues.dead_letter%'

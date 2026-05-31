@@ -1,0 +1,44 @@
+{
+  "name": "pancho/smart-mailer-router-bundle",
+  "description": "Enterprise-grade routing and deliverability optimization bundle for Mautic 7.x.",
+  "type": "mautic-plugin",
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "doctrine/orm": "^3.2",
+    "doctrine/doctrine-bundle": "^2.13",
+    "doctrine/migrations": "^3.8",
+    "symfony/config": "^7.0",
+    "symfony/dependency-injection": "^7.0",
+    "symfony/framework-bundle": "^7.0",
+    "symfony/http-client": "^7.0",
+    "symfony/http-foundation": "^7.0",
+    "symfony/http-kernel": "^7.0",
+    "symfony/mailer": "^7.0",
+    "symfony/messenger": "^7.0",
+    "symfony/routing": "^7.0",
+    "symfony/serializer": "^7.0",
+    "symfony/uid": "^7.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "MauticPlugin\\SmartMailerRouterBundle\\": ""
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "MauticPlugin\\SmartMailerRouterBundle\\Tests\\": "Tests/"
+    }
+  },
+  "extra": {
+    "install-directory-name": "SmartMailerRouterBundle",
+    "branch-alias": {
+      "dev-main": "0.1-dev"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

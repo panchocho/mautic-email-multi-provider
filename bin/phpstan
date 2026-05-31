@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.tools"
+PHAR_PATH="${TOOLS_DIR}/phpstan-2.0.4.phar"
+PHPSTAN_URL="https://github.com/phpstan/phpstan/releases/download/2.0.4/phpstan.phar"
+
+mkdir -p "${TOOLS_DIR}"
+
+if [[ ! -f "${PHAR_PATH}" ]]; then
+    exec 9>"${TOOLS_DIR}/phpstan.lock"
+    flock 9
+    if [[ ! -f "${PHAR_PATH}" ]]; then
+        tmp_file="${PHAR_PATH}.tmp.$$"
+        curl -fsSL "${PHPSTAN_URL}" -o "${tmp_file}"
+        mv "${tmp_file}" "${PHAR_PATH}"
+        chmod +x "${PHAR_PATH}"
+    fi
+fi
+
+exec php "${PHAR_PATH}" "$@"

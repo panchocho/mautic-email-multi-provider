@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CACHE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.tools"
+PHAR_PATH="${CACHE_DIR}/phpunit-10.5.63.phar"
+PHPUNIT_URL="https://phar.phpunit.de/phpunit-10.5.63.phar"
+
+mkdir -p "${CACHE_DIR}"
+
+if [[ ! -f "${PHAR_PATH}" ]]; then
+    exec 9>"${CACHE_DIR}/phpunit.lock"
+    flock 9
+    if [[ ! -f "${PHAR_PATH}" ]]; then
+        tmp_file="${PHAR_PATH}.tmp.$$"
+        curl -fsSL "${PHPUNIT_URL}" -o "${tmp_file}"
+        mv "${tmp_file}" "${PHAR_PATH}"
+        chmod +x "${PHAR_PATH}"
+    fi
+fi
+
+exec php "${PHAR_PATH}" "$@"

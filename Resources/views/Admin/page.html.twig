@@ -1,0 +1,31 @@
+{% extends '@MauticCore/Default/content.html.twig' %}
+
+{% block headerTitle %}Smart Mailer Router{% endblock %}
+{% block mauticContent %}smartMailerRouter{% endblock %}
+
+{% block content %}
+    <div class="panel panel-default mb-0">
+        <div class="panel-heading">
+            <div class="d-flex ai-center gap-sm">
+                <img src="{{ asset('plugins/SmartMailerRouterBundle/Assets/img/icon.png') }}" alt="Smart Mailer Router" style="width:28px;height:28px;object-fit:contain;">
+                <div>
+                    <h4 class="mb-0">{{ pageTitle }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="mb-md">
+                {% for name, route in sections %}
+                    {% set isActive = name == module %}
+                    <a href="{{ path(route) }}" data-toggle="ajax" class="btn {{ isActive ? 'btn-primary' : 'btn-ghost' }} btn-sm mr-sm mb-sm">{{ name|capitalize }}</a>
+                {% endfor %}
+            </div>
+
+            {% if notice %}
+                <div class="alert alert-info">{{ notice }}</div>
+            {% endif %}
+
+            {{ moduleContent|raw }}
+        </div>
+    </div>
+{% endblock %}
