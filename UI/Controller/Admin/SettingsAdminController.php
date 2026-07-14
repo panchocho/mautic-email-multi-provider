@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin;
 
+use JsonException;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SmartMailerSettingsRepository;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,13 +19,16 @@ final class SettingsAdminController extends AbstractAdminController
     public function __invoke(Request $request): Response
     {
         $this->db();
-        /** @var \Symfony\Component\DependencyInjection\ContainerInterface $container */
-        $container = $this->container;
-        $repository = $container->get(SmartMailerSettingsRepository::class);
+        $repository = $this->settingsRepository();
         if (!$repository instanceof SmartMailerSettingsRepository) {
             return $this->renderAdminPage($request, 'settings', 'Settings', '<div class="alert alert-danger">No se pudo cargar la configuración.</div>');
         }
+        $jsonExampleRegistry = $this->jsonExampleRegistry();
+        $jsonExamples = $jsonExampleRegistry !== null
+            ? $jsonExampleRegistry->exampleJson($jsonExampleRegistry->examples())
+            : ($repository->get('ui.json_examples', '{}') ?? '{}');
 
+        $container = $this->container;
         $defaults = $container->hasParameter('smart_mailer_router.maintenance')
             ? (array) $container->getParameter('smart_mailer_router.maintenance')
             : [];
@@ -41,7 +45,7 @@ final class SettingsAdminController extends AbstractAdminController
         ];
 
         $content = sprintf(
-            '<h2 style="margin:0 0 12px;">Settings</h2><p style="margin:0 0 8px;color:#4b5563;">Retención y operación del router.</p><form method="post" action="%s" style="display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px;align-items:start;max-width:900px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Delivery log retention days<input type="number" min="1" name="delivery_log_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Delivery archive retention days<input type="number" min="1" name="delivery_archive_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Health history retention days<input type="number" min="1" name="health_history_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry retention days<input type="number" min="1" name="retry_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry max retries<input type="number" min="1" name="retry_max_retries" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry base delay (ms)<input type="number" min="0" name="retry_base_delay_ms" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry multiplier<input type="number" min="1" step="0.1" name="retry_multiplier" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry max delay (ms)<input type="number" min="0" name="retry_max_delay_ms" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><div style="grid-column:1/-1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">Save settings</button></div></form>',
+            '<h2 style="margin:0 0 12px;">Settings</h2><p style="margin:0 0 8px;color:#4b5563;">Retención, operación y ejemplos JSON del router.</p><form method="post" action="%s" style="display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px;align-items:start;max-width:900px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Delivery log retention days<input type="number" min="1" name="delivery_log_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Delivery archive retention days<input type="number" min="1" name="delivery_archive_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Health history retention days<input type="number" min="1" name="health_history_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry retention days<input type="number" min="1" name="retry_retention_days" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry max retries<input type="number" min="1" name="retry_max_retries" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry base delay (ms)<input type="number" min="0" name="retry_base_delay_ms" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry multiplier<input type="number" min="1" step="0.1" name="retry_multiplier" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Retry max delay (ms)<input type="number" min="0" name="retry_max_delay_ms" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1/-1;">JSON examples overrides<textarea name="json_examples_json" rows="14" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;">%s</textarea><small style="color:#6b7280;">Opcional. Estructura esperada: providers / profiles / rules. Si lo dejás vacío, se usan los ejemplos por defecto.</small></label><div style="grid-column:1/-1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">Save settings</button></div></form>',
             $this->escape($this->generateUrl('smart_mailer_admin_settings_save')),
             $this->escape($this->csrfToken(self::SETTINGS_TOKEN_ID)),
             $this->escape((string) $values['delivery_log_retention_days']),
@@ -52,6 +56,7 @@ final class SettingsAdminController extends AbstractAdminController
             $this->escape((string) $values['retry_base_delay_ms']),
             $this->escape((string) $values['retry_multiplier']),
             $this->escape((string) $values['retry_max_delay_ms']),
+            $this->escape($jsonExamples),
         );
 
         return $this->renderAdminPage($request, 'settings', 'Settings', $content, $this->resolveNotice((string) $request->query->get('notice', '')));
@@ -65,9 +70,7 @@ final class SettingsAdminController extends AbstractAdminController
         }
 
         $this->db();
-        /** @var \Symfony\Component\DependencyInjection\ContainerInterface $container */
-        $container = $this->container;
-        $repository = $container->get(SmartMailerSettingsRepository::class);
+        $repository = $this->settingsRepository();
         if (!$repository instanceof SmartMailerSettingsRepository) {
             return $this->redirectWithNotice('db_error');
         }
@@ -82,6 +85,23 @@ final class SettingsAdminController extends AbstractAdminController
             'retry.multiplier' => $this->normalizePositiveFloat($request->request->get('retry_multiplier'), 2.0),
             'retry.max_delay_ms' => $this->normalizePositiveInt($request->request->get('retry_max_delay_ms'), 300000),
         ]);
+
+        $jsonExamplesRaw = trim((string) $request->request->get('json_examples_json', '{}'));
+        if ($jsonExamplesRaw !== '' && $jsonExamplesRaw !== '{}') {
+            try {
+                $decoded = json_decode($jsonExamplesRaw, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return $this->redirectWithNotice('json_examples_error');
+            }
+
+            if (!is_array($decoded)) {
+                return $this->redirectWithNotice('json_examples_error');
+            }
+
+            $repository->setJson('ui.json_examples', $decoded);
+        } else {
+            $repository->setJson('ui.json_examples', []);
+        }
 
         return $this->redirectWithNotice('settings_saved');
     }
@@ -113,6 +133,7 @@ final class SettingsAdminController extends AbstractAdminController
     {
         return match ($notice) {
             'settings_saved' => 'Configuración guardada correctamente.',
+            'json_examples_error' => 'Los ejemplos JSON no son válidos. Revisá el formato.',
             'csrf_error' => 'Token de seguridad inválido. Recargá la página e intentá de nuevo.',
             'db_error' => 'Error de base de datos. Revisá migraciones/conexión y volvé a intentar.',
             default => null,
