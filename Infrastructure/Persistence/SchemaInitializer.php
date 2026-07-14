@@ -41,7 +41,7 @@ final class SchemaInitializer
 
         try {
             if (!$schemaManager->tablesExist($tables)) {
-                foreach ($this->getCreateStatements() as $sql) {
+                foreach (self::createStatements() as $sql) {
                     $connection->executeStatement($sql);
                 }
             }
@@ -57,7 +57,7 @@ final class SchemaInitializer
     /**
      * @return list<string>
      */
-    private function getCreateStatements(): array
+    public static function createStatements(): array
     {
         return [
             <<<'SQL'
