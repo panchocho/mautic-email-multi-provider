@@ -39,6 +39,7 @@
 ## Síntomas de configuración incorrecta
 
 - `config_json` vacío en un provider nuevo: usar defaults del tipo de provider.
+- `config_json` vacío en la UI: ahora la pantalla precarga un ejemplo por defecto según el tipo de provider.
 - `api_key` presente en `smtp_only`: eso es inválido y debe corregirse.
 - `host` o `username` faltantes: faltan credenciales SMTP.
 - `sender_email` inválido: el alta debe ser rechazada.

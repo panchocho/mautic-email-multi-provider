@@ -32,7 +32,7 @@ Cada provider define credenciales, límites operativos y configuración específ
 
 ## Configuración
 
-La UI carga defaults según el `provider_type`.
+La UI carga defaults según el `provider_type`. Si `config_json` está vacío, se inserta un ejemplo por defecto para ese tipo antes de guardar.
 
 - Providers API: `transport: api`, `api_key`, `base_url`, `sender_email`, `sender_name`.
 - Providers SMTP: `transport: smtp`, `host`, `port`, `encryption`, `username`, `password`, `sender_email`, `sender_name`.

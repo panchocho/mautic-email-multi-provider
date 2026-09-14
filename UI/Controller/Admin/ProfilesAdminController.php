@@ -193,8 +193,8 @@ final class ProfilesAdminController extends AbstractAdminController
      */
     private function renderProfilesContent(array $profiles, ?array $editProfile): string
     {
-        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Field guide</strong><br><strong>Name:</strong> nombre único del profile de ruteo. <strong>Mode:</strong> modo primario (round robin, failover, etc.). <strong>Enabled:</strong> habilita o deshabilita el profile. <strong>config_json:</strong> parámetros específicos del modo (por ejemplo split percentages o reglas de tags).</div>';
-        $modeHelp = '<div class="alert alert-info mb-md"><strong>Tips por modo</strong><br><strong>domain_routing / multi_domain_routing:</strong> agregá <code>{"allowed_domains":["gmail.com","yahoo.com"]}</code>.<br><strong>percentage_split:</strong> usá <code>{"percentage_split":{"brevo":60,"resend":40}}</code>.<br><strong>geo_routing:</strong> podés documentar regiones en <code>config_json</code>, aunque el ranking usa el perfil del provider.<br>Si el modo no necesita parámetros, dejá <code>{}</code>.</div>';
+        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Field guide</strong><br><strong>Name:</strong> nombre único del profile de ruteo. <strong>Mode:</strong> modo primario (round robin, failover, etc.). <strong>Enabled:</strong> habilita o deshabilita el profile. <strong>config_json:</strong> parámetros específicos del modo (por ejemplo split percentages o reglas de tags). Si el JSON está vacío, la UI carga un ejemplo compatible con el modo elegido.</div>';
+        $modeHelp = '<div class="alert alert-info mb-md"><strong>Tips por modo</strong><br><strong>domain_routing / multi_domain_routing:</strong> agregá <code>{"allowed_domains":["gmail.com","yahoo.com"]}</code> y la UI lo precarga cuando elegís ese modo.<br><strong>percentage_split:</strong> usá <code>{"percentage_split":{"brevo":60,"resend":40}}</code>.<br><strong>geo_routing:</strong> podés documentar regiones en <code>config_json</code>, aunque el ranking usa el perfil del provider.<br>Si el modo no necesita parámetros, dejá <code>{}</code>.</div>';
         $createForm = $this->buildProfileForm(
             action: $this->generateUrl('smart_mailer_admin_profile_create'),
             tokenId: self::CREATE_TOKEN_ID,
@@ -257,22 +257,29 @@ final class ProfilesAdminController extends AbstractAdminController
         $name = trim((string) ($profile['name'] ?? ''));
         $selectedMode = (string) ($profile['mode'] ?? RoutingMode::ROUND_ROBIN->value);
         $enabledChecked = ((int) ($profile['enabled'] ?? 1)) === 1;
-        $configJson = $this->prettyJson((string) ($profile['config'] ?? '{}'));
+        $registry = $this->jsonExampleRegistry();
+        $configJson = $registry !== null
+            ? $registry->prettyJsonOrExample((string) ($profile['config'] ?? '{}'), $registry->profileConfig($selectedMode))
+            : $this->prettyJson((string) ($profile['config'] ?? '{}'));
 
         $modeOptions = '';
         foreach (RoutingMode::cases() as $mode) {
             $selected = $selectedMode === $mode->value ? ' selected' : '';
             $label = strtoupper(str_replace('_', ' ', $mode->value));
+            $defaultConfig = $registry !== null
+                ? $registry->exampleJson($registry->profileConfig($mode->value))
+                : '{}';
             $modeOptions .= sprintf(
-                '<option value="%s"%s>%s</option>',
+                '<option value="%s"%s data-default-config="%s">%s</option>',
                 $this->escape($mode->value),
                 $selected,
+                $this->escape($defaultConfig),
                 $this->escape($label)
             );
         }
 
         return sprintf(
-            '<div><h3 style="margin:0 0 8px;">%s</h3><form method="post" action="%s" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Nombre<input name="name" value="%s" required maxlength="120" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Mode<select name="mode" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</select></label><label style="display:flex;align-items:center;gap:8px;margin-top:24px;grid-column:1 / -1;"><input type="checkbox" name="enabled" value="1"%s> Habilitado</label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">config_json (objeto JSON)<textarea name="config_json" rows="8" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;">%s</textarea></label><div style="grid-column:1 / -1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">%s</button></div></form></div>',
+            '<div><h3 style="margin:0 0 8px;">%s</h3><form method="post" action="%s" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Nombre<input name="name" value="%s" required maxlength="120" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Mode<select name="mode" data-target="smart-mailer-profile-config-json" onchange="var textarea=document.getElementById(this.dataset.target);var option=this.selectedOptions&&this.selectedOptions[0];if(textarea&&option&&option.dataset&&option.dataset.defaultConfig){textarea.value=option.dataset.defaultConfig;}" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</select></label><label style="display:flex;align-items:center;gap:8px;margin-top:24px;grid-column:1 / -1;"><input type="checkbox" name="enabled" value="1"%s> Habilitado</label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">config_json (objeto JSON)<textarea name="config_json" id="smart-mailer-profile-config-json" rows="8" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;">%s</textarea></label><div style="grid-column:1 / -1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">%s</button></div></form></div>',
             is_array($profile) ? 'Editar profile' : 'Nuevo profile',
             $this->escape($action),
             $this->escape($this->csrfToken($tokenId)),

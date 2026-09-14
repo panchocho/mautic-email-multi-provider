@@ -29,6 +29,8 @@ Root key: `smart_mailer_router`
 - `retry.max_delay_ms`
 - `queues.routing|warmup|logs|dead_letter`
 
+> Nota: en la UI administrativa, los campos JSON vacíos se rellenan con ejemplos compatibles con el tipo o modo seleccionado. Eso no cambia la configuración guardada, solo facilita el alta inicial.
+
 ## Ejemplo
 
 ```yaml

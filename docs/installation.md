@@ -29,4 +29,4 @@ return [
 4. Ejecutar migraciones del plugin.
 5. Configurar Messenger (Redis o Doctrine transport).
 6. Configurar providers/routing profiles en panel admin.
-7. En `config_json`, elegir `transport: api` o `transport: smtp` según el provider. Si el provider soporta ambos modos, el schema acepta la configuración equivalente y la UI muestra ejemplos listos para copiar.
+7. En `config_json`, elegir `transport: api` o `transport: smtp` según el provider. Si el campo está vacío, la UI carga un ejemplo por defecto según el `provider_type`. Si el provider soporta ambos modos, el schema acepta la configuración equivalente y la UI muestra ejemplos listos para copiar.

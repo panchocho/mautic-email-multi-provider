@@ -6,6 +6,7 @@ namespace MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin;
 
 use JsonException;
 use MauticPlugin\SmartMailerRouterBundle\Domain\ValueObject\ProviderType;
+use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Config\JsonExampleRegistry;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\ProviderConfig\ProviderConfigSchemaRegistry;
 use Throwable;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -217,10 +218,11 @@ final class ProvidersAdminController extends AbstractAdminController
      */
     private function renderProvidersContent(array $providers, ?array $editProvider): string
     {
-        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Field guide</strong><br><strong>Name:</strong> visible label in routing screens. <strong>Code:</strong> unique internal key (lowercase, numbers, "_" or "-"). <strong>Type:</strong> provider engine (Brevo, Resend, SES, SMTP-only, etc). <strong>Enabled:</strong> if off, provider is excluded from routing. <strong>Weight:</strong> relative distribution in weighted modes. <strong>Priority:</strong> higher values win in priority/failover modes. <strong>Throughput limit:</strong> max emails/time window used by throttling. <strong>Cost per email:</strong> unit cost for cost-optimized routing. <strong>Reputation:</strong> manual score (0-100). <strong>Health score:</strong> current operational score (0-100). <strong>Tags:</strong> labels for rules (comma-separated). <strong>Notes:</strong> internal documentation. <strong>config_json:</strong> provider credentials/options in JSON format. Agregá <code>transport</code> con valor <code>api</code> o <code>smtp</code> para elegir el modo de envío.</div>';
+        $registry = $this->jsonExampleRegistry();
+        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Field guide</strong><br><strong>Name:</strong> visible label in routing screens. <strong>Code:</strong> unique internal key (lowercase, numbers, "_" or "-"). <strong>Type:</strong> provider engine (Brevo, Resend, SES, SMTP-only, etc). <strong>Enabled:</strong> if off, provider is excluded from routing. <strong>Weight:</strong> relative distribution in weighted modes. <strong>Priority:</strong> higher values win in priority/failover modes. <strong>Throughput limit:</strong> max emails/time window used by throttling. <strong>Cost per email:</strong> unit cost for cost-optimized routing. <strong>Reputation:</strong> manual score (0-100). <strong>Health score:</strong> current operational score (0-100). <strong>Tags:</strong> labels for rules (comma-separated). <strong>Notes:</strong> internal documentation. <strong>config_json:</strong> provider credentials/options in JSON format. Si lo dejás vacío, la UI carga un ejemplo por defecto según el tipo seleccionado. Agregá <code>transport</code> con valor <code>api</code> o <code>smtp</code> para elegir el modo de envío.</div>';
         $examplesHelp = sprintf(
             '<details class="mb-md"><summary><strong>JSON examples by provider (copy/paste)</strong></summary><div class="mt-sm"><p class="text-muted mb-sm">La config guardada acá se usa en el envío real cuando el adapter soporta ese provider. Cada provider puede funcionar con <code>transport: api</code> o <code>transport: smtp</code> según su esquema. Si falta una clave requerida, el alta queda rechazada.</p><p class="mb-xs"><strong>Brevo API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Brevo SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SendGrid API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SendGrid SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Amazon SES API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Amazon SES SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SMTP only</strong></p><pre style="white-space:pre-wrap;">%s</pre></div></details>',
-            $this->escape(json_encode($this->defaultConfigTemplate(ProviderType::BREVO->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
+            $this->escape($this->prettyJsonFromRegistry($registry, ProviderType::BREVO->value)),
             $this->escape(json_encode([
                 'transport' => 'smtp',
                 'host' => 'smtp.brevo.com',
@@ -231,7 +233,7 @@ final class ProvidersAdminController extends AbstractAdminController
                 'sender_email' => 'no-reply@tu-dominio.com',
                 'sender_name' => 'Tu Marca',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
-            $this->escape(json_encode($this->defaultConfigTemplate(ProviderType::SENDGRID->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
+            $this->escape($this->prettyJsonFromRegistry($registry, ProviderType::SENDGRID->value)),
             $this->escape(json_encode([
                 'transport' => 'smtp',
                 'host' => 'smtp.sendgrid.net',
@@ -242,7 +244,7 @@ final class ProvidersAdminController extends AbstractAdminController
                 'sender_email' => 'no-reply@tu-dominio.com',
                 'sender_name' => 'Tu Marca',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
-            $this->escape(json_encode($this->defaultConfigTemplate(ProviderType::AMAZON_SES->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
+            $this->escape($this->prettyJsonFromRegistry($registry, ProviderType::AMAZON_SES->value)),
             $this->escape(json_encode([
                 'transport' => 'smtp',
                 'host' => 'email-smtp.us-east-1.amazonaws.com',
@@ -253,7 +255,7 @@ final class ProvidersAdminController extends AbstractAdminController
                 'sender_email' => 'no-reply@tu-dominio.com',
                 'sender_name' => 'Tu Marca',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}'),
-            $this->escape(json_encode($this->defaultConfigTemplate(ProviderType::SMTP_ONLY->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}')
+            $this->escape($this->prettyJsonFromRegistry($registry, ProviderType::SMTP_ONLY->value))
         );
 
         $createForm = $this->buildProviderForm(
@@ -329,16 +331,21 @@ final class ProvidersAdminController extends AbstractAdminController
         $healthScore = (string) ((int) ($provider['health_score'] ?? 100));
         $tags = $this->decodeTags((string) ($provider['tags'] ?? '[]'));
         $notes = (string) ($provider['notes'] ?? '');
+        $registry = $this->jsonExampleRegistry();
         $configJson = $this->prettyJson((string) ($provider['config'] ?? '{}'));
         if (!is_array($provider) || !array_key_exists('config', $provider) || trim((string) $provider['config']) === '' || trim((string) $provider['config']) === '{}') {
-            $configJson = json_encode($this->defaultConfigTemplate($selectedType), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}';
+            $configJson = $registry !== null
+                ? $this->prettyJsonFromRegistry($registry, $selectedType)
+                : (json_encode($this->defaultConfigTemplate($selectedType), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}');
         }
 
         $typeOptions = '';
         foreach (ProviderType::cases() as $providerType) {
             $selected = $selectedType === $providerType->value ? ' selected' : '';
             $label = strtoupper(str_replace('_', ' ', $providerType->value));
-            $defaultConfig = json_encode($this->defaultConfigTemplate($providerType->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}';
+            $defaultConfig = $registry !== null
+                ? $this->prettyJsonFromRegistry($registry, $providerType->value)
+                : (json_encode($this->defaultConfigTemplate($providerType->value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}');
             $typeOptions .= sprintf(
                 '<option value="%s"%s data-default-config="%s">%s</option>',
                 $this->escape($providerType->value),
@@ -517,9 +524,9 @@ final class ProvidersAdminController extends AbstractAdminController
      */
     private function defaultConfigTemplate(string $providerType): array
     {
-        $registry = $this->providerConfigSchemaRegistry();
+        $registry = $this->jsonExampleRegistry();
         if ($registry !== null) {
-            return $registry->defaultTemplate($providerType);
+            return $registry->providerConfig($providerType);
         }
 
         return match (strtolower(trim($providerType))) {
@@ -551,6 +558,15 @@ final class ProvidersAdminController extends AbstractAdminController
                 'sender_name' => 'Tu Marca',
             ],
         };
+    }
+
+    private function prettyJsonFromRegistry(?JsonExampleRegistry $registry, string $providerType): string
+    {
+        if (!$registry instanceof JsonExampleRegistry) {
+            return $this->prettyJson(json_encode($this->defaultConfigTemplate($providerType), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}');
+        }
+
+        return $registry->exampleJson($registry->providerConfig($providerType));
     }
 
     private function providerConfigSchemaRegistry(): ?ProviderConfigSchemaRegistry

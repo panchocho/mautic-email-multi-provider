@@ -185,11 +185,9 @@ final class WarmupAdminController extends AbstractAdminController
     private function resolveQueueName(string $queueKey, string $default): string
     {
         $parameter = sprintf('smart_mailer_router.queues.%s', $queueKey);
-        if ($this->container->hasParameter($parameter)) {
-            $value = $this->container->getParameter($parameter);
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
+        $value = $this->coreParametersHelper->get($parameter);
+        if (is_string($value) && $value !== '') {
+            return $value;
         }
 
         return $default;

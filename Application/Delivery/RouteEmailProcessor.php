@@ -16,7 +16,7 @@ use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Messenger\Message\RouteE
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\ProviderConfigurationRepository;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-final class RouteEmailProcessor
+final class RouteEmailProcessor implements RouteEmailProcessorInterface
 {
     public function __construct(
         private readonly ProviderAdapterFactory $providerAdapterFactory,
@@ -91,7 +91,9 @@ final class RouteEmailProcessor
             $selectedProviderCode
         );
         if ($providerConfig !== null) {
-            $payload['provider_config'] = $providerConfig;
+            $payload['provider_config'] = is_array($providerConfig['config'] ?? null)
+                ? $providerConfig['config']
+                : [];
             $payload['provider_config_code'] = $providerConfig['code'] ?? null;
         }
 

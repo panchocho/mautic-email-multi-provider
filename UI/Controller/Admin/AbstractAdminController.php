@@ -6,12 +6,50 @@ namespace MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin;
 
 use Doctrine\DBAL\Connection;
 use Mautic\CoreBundle\Controller\CommonController;
+use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Config\JsonExampleRegistry;
+use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SmartMailerSettingsRepository;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SchemaInitializer;
+use Doctrine\Persistence\ManagerRegistry;
+use Mautic\CoreBundle\Factory\ModelFactory;
+use Mautic\CoreBundle\Helper\CoreParametersHelper;
+use Mautic\CoreBundle\Helper\UserHelper;
+use Mautic\CoreBundle\Security\Permissions\CorePermissions;
+use Mautic\CoreBundle\Service\FlashBag;
+use Mautic\CoreBundle\Translation\Translator;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Contracts\Service\Attribute\Required;
 
 abstract class AbstractAdminController extends CommonController
 {
+    public function __construct(
+        ManagerRegistry $doctrine,
+        ModelFactory $modelFactory,
+        UserHelper $userHelper,
+        CoreParametersHelper $coreParametersHelper,
+        EventDispatcherInterface $dispatcher,
+        Translator $translator,
+        FlashBag $flashBag,
+        ?RequestStack $requestStack,
+        ?CorePermissions $security,
+        protected ?JsonExampleRegistry $jsonExampleRegistry = null,
+        protected ?SmartMailerSettingsRepository $settingsRepository = null
+    ) {
+        parent::__construct(
+            $doctrine,
+            $modelFactory,
+            $userHelper,
+            $coreParametersHelper,
+            $dispatcher,
+            $translator,
+            $flashBag,
+            $requestStack,
+            $security
+        );
+    }
+
     protected function renderAdminPage(
         Request $request,
         string $module,
@@ -64,6 +102,28 @@ abstract class AbstractAdminController extends CommonController
         }
 
         return $this->doctrine->getConnection();
+    }
+
+    protected function jsonExampleRegistry(): ?JsonExampleRegistry
+    {
+        return $this->jsonExampleRegistry;
+    }
+
+    protected function settingsRepository(): ?SmartMailerSettingsRepository
+    {
+        return $this->settingsRepository;
+    }
+
+    #[Required]
+    public function setJsonExampleRegistry(?JsonExampleRegistry $jsonExampleRegistry): void
+    {
+        $this->jsonExampleRegistry = $jsonExampleRegistry;
+    }
+
+    #[Required]
+    public function setSettingsRepository(?SmartMailerSettingsRepository $settingsRepository): void
+    {
+        $this->settingsRepository = $settingsRepository;
     }
 
     /**

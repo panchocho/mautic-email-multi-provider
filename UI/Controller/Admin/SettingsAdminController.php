@@ -24,24 +24,21 @@ final class SettingsAdminController extends AbstractAdminController
             return $this->renderAdminPage($request, 'settings', 'Settings', '<div class="alert alert-danger">No se pudo cargar la configuración.</div>');
         }
         $jsonExampleRegistry = $this->jsonExampleRegistry();
+        $defaults = SmartMailerSettingsRepository::defaultValues();
         $jsonExamples = $jsonExampleRegistry !== null
             ? $jsonExampleRegistry->exampleJson($jsonExampleRegistry->examples())
             : ($repository->get('ui.json_examples', '{}') ?? '{}');
 
-        $container = $this->container;
-        $defaults = $container->hasParameter('smart_mailer_router.maintenance')
-            ? (array) $container->getParameter('smart_mailer_router.maintenance')
-            : [];
-        $retryDefaults = (array) $container->getParameter('smart_mailer_router.retry');
         $values = [
-            'delivery_log_retention_days' => $repository->getInt('maintenance.delivery_log_retention_days', (int) ($defaults['delivery_log_retention_days'] ?? 90)),
-            'delivery_archive_retention_days' => $repository->getInt('maintenance.delivery_archive_retention_days', (int) ($defaults['delivery_archive_retention_days'] ?? 180)),
-            'health_history_retention_days' => $repository->getInt('maintenance.health_history_retention_days', (int) ($defaults['health_history_retention_days'] ?? 180)),
-            'retry_retention_days' => $repository->getInt('maintenance.retry_retention_days', (int) ($defaults['retry_retention_days'] ?? 30)),
-            'retry_max_retries' => $repository->getInt('retry.max_retries', (int) ($retryDefaults['max_retries'] ?? 8)),
-            'retry_base_delay_ms' => $repository->getInt('retry.base_delay_ms', (int) ($retryDefaults['base_delay_ms'] ?? 2000)),
-            'retry_multiplier' => $repository->getFloat('retry.multiplier', (float) ($retryDefaults['multiplier'] ?? 2.0)),
-            'retry_max_delay_ms' => $repository->getInt('retry.max_delay_ms', (int) ($retryDefaults['max_delay_ms'] ?? 300000)),
+            'router_active' => $repository->isActive(),
+            'delivery_log_retention_days' => $repository->getInt('maintenance.delivery_log_retention_days', (int) ($defaults['maintenance.delivery_log_retention_days'] ?? 90)),
+            'delivery_archive_retention_days' => $repository->getInt('maintenance.delivery_archive_retention_days', (int) ($defaults['maintenance.delivery_archive_retention_days'] ?? 180)),
+            'health_history_retention_days' => $repository->getInt('maintenance.health_history_retention_days', (int) ($defaults['maintenance.health_history_retention_days'] ?? 180)),
+            'retry_retention_days' => $repository->getInt('maintenance.retry_retention_days', (int) ($defaults['maintenance.retry_retention_days'] ?? 30)),
+            'retry_max_retries' => $repository->getInt('retry.max_retries', (int) ($defaults['retry.max_retries'] ?? 8)),
+            'retry_base_delay_ms' => $repository->getInt('retry.base_delay_ms', (int) ($defaults['retry.base_delay_ms'] ?? 2000)),
+            'retry_multiplier' => $repository->getFloat('retry.multiplier', (float) ($defaults['retry.multiplier'] ?? 2.0)),
+            'retry_max_delay_ms' => $repository->getInt('retry.max_delay_ms', (int) ($defaults['retry.max_delay_ms'] ?? 300000)),
         ];
 
         $content = sprintf(
@@ -58,6 +55,17 @@ final class SettingsAdminController extends AbstractAdminController
             $this->escape((string) $values['retry_max_delay_ms']),
             $this->escape($jsonExamples),
         );
+
+        $activeCheckbox = sprintf(
+            '<label style="display:flex;align-items:center;gap:8px;grid-column:1/-1;"><input type="checkbox" name="router_active" value="1"%s> Router activo</label>',
+            $values['router_active'] ? ' checked' : '',
+        );
+        $content = preg_replace(
+            '/(<input type="hidden" name="_token" value="[^"]+">)/',
+            '$1'.$activeCheckbox,
+            $content,
+            1
+        ) ?: $content;
 
         return $this->renderAdminPage($request, 'settings', 'Settings', $content, $this->resolveNotice((string) $request->query->get('notice', '')));
     }
@@ -76,6 +84,7 @@ final class SettingsAdminController extends AbstractAdminController
         }
 
         $repository->setMany([
+            'router.active' => $request->request->getBoolean('router_active', false) ? '1' : '0',
             'maintenance.delivery_log_retention_days' => $this->normalizePositiveInt($request->request->get('delivery_log_retention_days'), 90),
             'maintenance.delivery_archive_retention_days' => $this->normalizePositiveInt($request->request->get('delivery_archive_retention_days'), 180),
             'maintenance.health_history_retention_days' => $this->normalizePositiveInt($request->request->get('health_history_retention_days'), 180),

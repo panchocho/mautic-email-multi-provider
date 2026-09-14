@@ -12,6 +12,7 @@ La sección `Settings` controla la retención y el comportamiento operativo del 
 - `retry.base_delay_ms`
 - `retry.multiplier`
 - `retry.max_delay_ms`
+- `ui.json_examples`
 
 ## Comportamiento
 
@@ -29,6 +30,7 @@ La sección `Settings` controla la retención y el comportamiento operativo del 
 - `retry.base_delay_ms`: demora inicial entre reintentos.
 - `retry.multiplier`: factor de backoff exponencial.
 - `retry.max_delay_ms`: tope superior de espera entre reintentos.
+- `ui.json_examples`: override opcional de ejemplos JSON para providers, profiles y rules.
 
 ## Defaults canónicos
 
@@ -41,6 +43,7 @@ retry.max_retries = 8
 retry.base_delay_ms = 2000
 retry.multiplier = 2.0
 retry.max_delay_ms = 300000
+ui.json_examples = {}
 ```
 
 ## Operación diaria

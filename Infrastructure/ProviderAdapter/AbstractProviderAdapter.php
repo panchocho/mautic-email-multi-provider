@@ -9,9 +9,6 @@ use MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Contract\ProviderAdapte
 use MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Model\ProviderProfile;
 use MauticPlugin\SmartMailerRouterBundle\Domain\Provider\Model\ProviderSendResult;
 use MauticPlugin\SmartMailerRouterBundle\Domain\Routing\Model\RoutingRequest;
-use Symfony\Component\Mailer\Transport\Transport;
-use Symfony\Component\Mime\Address;
-use Symfony\Component\Mime\Email;
 
 abstract class AbstractProviderAdapter implements ProviderAdapterInterface
 {
@@ -299,48 +296,256 @@ abstract class AbstractProviderAdapter implements ProviderAdapterInterface
             return $this->failureResult('empty_message_body', 0);
         }
 
-        $username = (string) $config['username'];
-        $password = (string) $config['password'];
-        $encryption = strtolower((string) ($config['encryption'] ?? 'tls'));
-        $dsn = sprintf(
-            'smtp://%s:%s@%s:%d?encryption=%s',
-            rawurlencode($username),
-            rawurlencode($password),
-            $host,
-            $port,
-            rawurlencode($encryption)
-        );
-
         try {
-            $transport = Transport::fromDsn($dsn);
-            $email = new Email();
             $senderName = $this->resolveSenderName($payload, $config);
-            $email->from($senderName !== '' ? new Address($senderEmail, $senderName) : new Address($senderEmail));
-            $email->to($request->recipient);
-            $email->subject($parts['subject']);
-            if ($parts['html'] !== '') {
-                $email->html($parts['html']);
-            }
-            if ($parts['text'] !== '') {
-                $email->text($parts['text']);
-            }
-            if (isset($payload['reply_to']) && is_string($payload['reply_to']) && trim($payload['reply_to']) !== '') {
-                $email->replyTo(trim($payload['reply_to']));
-            }
-
-            $sentMessage = $transport->send($email);
-            $messageId = $sentMessage->getMessageId() ?: $this->fallbackMessageId($request);
+            $encryption = strtolower((string) ($config['encryption'] ?? 'tls'));
+            $messageId = $this->sendRawSmtpMessage(
+                host: $host,
+                port: $port,
+                encryption: $encryption,
+                username: (string) $config['username'],
+                password: (string) $config['password'],
+                fromEmail: $senderEmail,
+                fromName: $senderName,
+                recipient: $request->recipient,
+                subject: $parts['subject'],
+                html: $parts['html'],
+                text: $parts['text'],
+                replyTo: isset($payload['reply_to']) && is_string($payload['reply_to']) ? trim($payload['reply_to']) : null
+            );
 
             return $this->acceptedResult($messageId, array_merge([
                 'transport' => $transportLabel,
                 'host' => $host,
                 'port' => $port,
+                'encryption' => $encryption,
             ], $metadata));
         } catch (\Throwable $exception) {
             return $this->failureResult($transportLabel . '_transport_error', 60, [
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * @return resource
+     */
+    private function openSmtpConnection(string $host, int $port, string $encryption)
+    {
+        $scheme = $encryption === 'ssl' ? 'ssl://' : 'tcp://';
+        $context = stream_context_create([
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'allow_self_signed' => false,
+            ],
+        ]);
+
+        $socket = @stream_socket_client(
+            $scheme . $host . ':' . $port,
+            $errno,
+            $errstr,
+            20,
+            STREAM_CLIENT_CONNECT,
+            $context
+        );
+
+        if (!is_resource($socket)) {
+            throw new \RuntimeException(sprintf('SMTP connect failed: %d %s', $errno, $errstr));
+        }
+
+        stream_set_timeout($socket, 20);
+
+        return $socket;
+    }
+
+    /**
+     * @param resource $socket
+     * @return array{code: string, lines: list<string>}
+     */
+    private function readSmtpResponse($socket): array
+    {
+        $lines = [];
+        while (($line = fgets($socket, 4096)) !== false) {
+            $line = rtrim($line, "\r\n");
+            $lines[] = $line;
+            if (strlen($line) >= 4 && ctype_digit(substr($line, 0, 3)) && $line[3] === ' ') {
+                break;
+            }
+        }
+
+        if ($lines === []) {
+            throw new \RuntimeException('SMTP response is empty');
+        }
+
+        return [
+            'code' => substr($lines[0], 0, 3),
+            'lines' => $lines,
+        ];
+    }
+
+    /**
+     * @param resource $socket
+     * @param list<string> $expectedCodes
+     * @return array{code: string, lines: list<string>}
+     */
+    private function sendSmtpCommand($socket, string $command, array $expectedCodes, string $stage): array
+    {
+        fwrite($socket, $command . "\r\n");
+        $response = $this->readSmtpResponse($socket);
+        if (!in_array($response['code'], $expectedCodes, true)) {
+            throw new \RuntimeException(sprintf(
+                '%s failed: %s',
+                $stage,
+                implode(' | ', $response['lines'])
+            ));
+        }
+
+        return $response;
+    }
+
+    /**
+     * @param resource $socket
+     */
+    private function authenticateSmtpLogin($socket, string $username, string $password): void
+    {
+        $this->sendSmtpCommand($socket, 'AUTH LOGIN', ['334'], 'auth login');
+        $this->sendSmtpCommand($socket, base64_encode($username), ['334'], 'auth username');
+        $this->sendSmtpCommand($socket, base64_encode($password), ['235'], 'auth password');
+    }
+
+    private function normalizeEol(string $body): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", $body);
+    }
+
+    private function dotStuff(string $body): string
+    {
+        $lines = explode("\n", $this->normalizeEol($body));
+        foreach ($lines as &$line) {
+            if ($line !== '' && str_starts_with($line, '.')) {
+                $line = '.' . $line;
+            }
+        }
+        unset($line);
+
+        return implode("\r\n", $lines);
+    }
+
+    private function buildSmtpMessage(
+        string $fromEmail,
+        string $fromName,
+        string $recipient,
+        string $subject,
+        string $html,
+        string $text,
+        ?string $replyTo = null
+    ): string {
+        $headers = [
+            'From: ' . ($fromName !== '' ? sprintf('%s <%s>', $fromName, $fromEmail) : $fromEmail),
+            'To: <' . $recipient . '>',
+            'Subject: ' . $subject,
+            'Date: ' . gmdate('D, d M Y H:i:s O'),
+            'Message-ID: <' . bin2hex(random_bytes(16)) . '@mautic.local>',
+            'MIME-Version: 1.0',
+        ];
+        if ($replyTo !== null && $replyTo !== '') {
+            $headers[] = 'Reply-To: <' . $replyTo . '>';
+        }
+
+        if ($html !== '' && $text !== '') {
+            $boundary = '=_smr_' . bin2hex(random_bytes(8));
+            $headers[] = 'Content-Type: multipart/alternative; boundary="' . $boundary . '"';
+            $body = [
+                '--' . $boundary,
+                'Content-Type: text/plain; charset=UTF-8',
+                'Content-Transfer-Encoding: 8bit',
+                '',
+                $text,
+                '--' . $boundary,
+                'Content-Type: text/html; charset=UTF-8',
+                'Content-Transfer-Encoding: 8bit',
+                '',
+                $html,
+                '--' . $boundary . '--',
+                '',
+            ];
+        } elseif ($html !== '') {
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'Content-Transfer-Encoding: 8bit';
+            $body = ['', $html, ''];
+        } else {
+            $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+            $headers[] = 'Content-Transfer-Encoding: 8bit';
+            $body = ['', $text !== '' ? $text : '(no content)', ''];
+        }
+
+        return implode("\r\n", $headers) . "\r\n\r\n" . $this->dotStuff(implode("\r\n", $body));
+    }
+
+    private function sendRawSmtpMessage(
+        string $host,
+        int $port,
+        string $encryption,
+        string $username,
+        string $password,
+        string $fromEmail,
+        string $fromName,
+        string $recipient,
+        string $subject,
+        string $html,
+        string $text,
+        ?string $replyTo = null
+    ): string {
+        $socket = $this->openSmtpConnection($host, $port, $encryption);
+        try {
+            $this->readSmtpResponse($socket);
+            $this->sendSmtpCommand($socket, 'EHLO localhost', ['250'], 'ehlo');
+
+            if ($encryption === 'tls') {
+                $this->sendSmtpCommand($socket, 'STARTTLS', ['220'], 'starttls');
+                if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                    throw new \RuntimeException('TLS negotiation failed');
+                }
+                $this->sendSmtpCommand($socket, 'EHLO localhost', ['250'], 'post-tls ehlo');
+            }
+
+            $this->authenticateSmtpLogin($socket, $username, $password);
+            $this->sendSmtpCommand($socket, 'MAIL FROM:<' . $fromEmail . '>', ['250'], 'mail from');
+            $this->sendSmtpCommand($socket, 'RCPT TO:<' . $recipient . '>', ['250', '251'], 'rcpt to');
+            $this->sendSmtpCommand($socket, 'DATA', ['354'], 'data');
+
+            $message = $this->buildSmtpMessage(
+                fromEmail: $fromEmail,
+                fromName: $fromName,
+                recipient: $recipient,
+                subject: $subject,
+                html: $html,
+                text: $text,
+                replyTo: $replyTo
+            );
+            fwrite($socket, $message . "\r\n.\r\n");
+            $final = $this->readSmtpResponse($socket);
+            if (!in_array($final['code'], ['250'], true)) {
+                throw new \RuntimeException('send data failed: ' . implode(' | ', $final['lines']));
+            }
+
+            $this->sendSmtpCommand($socket, 'QUIT', ['221'], 'quit');
+
+            return $this->fallbackMessageId(new RoutingRequest(
+                requestId: 'smtp-' . bin2hex(random_bytes(8)),
+                tenantId: '',
+                campaignType: '',
+                region: '',
+                messageType: '',
+                priority: 0,
+                recipient: $recipient
+            ));
+        } finally {
+            if (is_resource($socket)) {
+                fclose($socket);
+            }
         }
     }
 }

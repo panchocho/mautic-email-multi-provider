@@ -8,6 +8,13 @@ return [
     'version'     => '0.1.4',
     'author'      => 'OpenAI',
     'routes'      => [
+        'public' => [
+            'smart_mailer_resend_webhook' => [
+                'path'       => '/smart-mailer/resend/webhook',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Webhook\ResendWebhookController::class,
+                'method'     => 'POST',
+            ],
+        ],
         'main' => [
             'smart_mailer_admin_dashboard' => [
                 'path'       => '/admin/smart-mailer',

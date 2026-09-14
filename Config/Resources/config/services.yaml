@@ -55,6 +55,9 @@ services:
     arguments:
       $adapters: !tagged_iterator smart_mailer_router.provider_adapter
 
+  MauticPlugin\SmartMailerRouterBundle\Application\Delivery\RouteEmailProcessorInterface:
+    alias: MauticPlugin\SmartMailerRouterBundle\Application\Delivery\RouteEmailProcessor
+
   MauticPlugin\SmartMailerRouterBundle\Application\Routing\ModeRoutingStrategyFactory:
     arguments:
       $strategies: !tagged_iterator smart_mailer_router.mode_strategy

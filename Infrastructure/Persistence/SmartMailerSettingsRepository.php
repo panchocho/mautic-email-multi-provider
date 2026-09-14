@@ -14,6 +14,7 @@ final class SmartMailerSettingsRepository
     public static function defaultValues(): array
     {
         return [
+            'router.active' => '1',
             'maintenance.delivery_log_retention_days' => '90',
             'maintenance.delivery_archive_retention_days' => '180',
             'maintenance.health_history_retention_days' => '180',
@@ -22,6 +23,7 @@ final class SmartMailerSettingsRepository
             'retry.base_delay_ms' => '2000',
             'retry.multiplier' => '2.0',
             'retry.max_delay_ms' => '300000',
+            'ui.json_examples' => '{}',
         ];
     }
 
@@ -91,6 +93,13 @@ final class SmartMailerSettingsRepository
         return (float) $value;
     }
 
+    public function isActive(): bool
+    {
+        $value = strtolower(trim((string) $this->get('router.active', '1')));
+
+        return !in_array($value, ['', '0', 'false', 'off', 'no', 'disabled'], true);
+    }
+
     /**
      * @param array<string, scalar|null> $values
      */
@@ -119,5 +128,32 @@ final class SmartMailerSettingsRepository
                 'setting_value' => $value,
             ]
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getJson(string $key, array $default = []): array
+    {
+        $value = $this->get($key);
+        if ($value === null || trim($value) === '') {
+            return $default;
+        }
+
+        try {
+            $decoded = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $default;
+        }
+
+        return is_array($decoded) ? $decoded : $default;
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     */
+    public function setJson(string $key, array $value): void
+    {
+        $this->set($key, json_encode($value, JSON_UNESCAPED_SLASHES) ?: '{}');
     }
 }

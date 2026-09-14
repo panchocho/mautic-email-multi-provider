@@ -14,6 +14,7 @@
 - `retry`
 - `maintenance`
 - `queues`
+- `ui.json_examples` guarda overrides opcionales de ejemplos JSON usados por la UI
 
 ## Providers
 
@@ -36,4 +37,4 @@ Cada provider puede declarar:
 - API-backed providers pueden usar `transport: api` o `transport: smtp` si el schema lo permite.
 - `smtp_only` acepta únicamente credenciales SMTP.
 - El UI valida el JSON antes de persistirlo.
-
+- La sección `Settings` permite editar overrides de ejemplos JSON sin tocar el código.

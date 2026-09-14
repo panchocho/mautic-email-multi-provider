@@ -7,7 +7,7 @@ SmartMailerRouter agrega ruteo inteligente de correo sobre Mautic con soporte pa
 - Selección dinámica de provider por profile, rules y bindings.
 - Prioridad, peso, health y quarantine.
 - Soporte para providers API y SMTP.
-- Defaults por tipo de provider en `config_json`.
+- Defaults por tipo de provider en `config_json` y autocompletado de ejemplos cuando el JSON está vacío.
 - Registro de envíos, retries y eventos de deliverability.
 - Persistencia de settings operativos con defaults para instalaciones limpias.
 

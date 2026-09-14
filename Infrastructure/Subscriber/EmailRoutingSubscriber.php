@@ -7,11 +7,15 @@ namespace MauticPlugin\SmartMailerRouterBundle\Infrastructure\Subscriber;
 use MauticPlugin\SmartMailerRouterBundle\Application\Delivery\RouteEmailProcessor;
 use MauticPlugin\SmartMailerRouterBundle\Application\Event\EmailRoutingRequestedEvent;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Messenger\Message\RouteEmailCommand;
+use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SmartMailerSettingsRepository;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 final class EmailRoutingSubscriber implements EventSubscriberInterface
 {
-    public function __construct(private readonly RouteEmailProcessor $routeEmailProcessor)
+    public function __construct(
+        private readonly RouteEmailProcessor $routeEmailProcessor,
+        private readonly ?SmartMailerSettingsRepository $settingsRepository = null,
+    )
     {
     }
 
@@ -24,6 +28,10 @@ final class EmailRoutingSubscriber implements EventSubscriberInterface
 
     public function onRoutingRequested(EmailRoutingRequestedEvent $event): void
     {
+        if ($this->settingsRepository !== null && !$this->settingsRepository->isActive()) {
+            return;
+        }
+
         $this->routeEmailProcessor->process(new RouteEmailCommand(
             requestId: $event->requestId,
             tenantId: $event->tenantId,
