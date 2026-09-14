@@ -138,6 +138,7 @@ abstract class AbstractAdminController extends CommonController
             'bindings' => 'smart_mailer_admin_bindings',
             'profiles'  => 'smart_mailer_admin_profiles',
             'campaign-routing' => 'smart_mailer_admin_campaign_routing',
+            'campaign-overrides' => 'smart_mailer_admin_campaign_overrides',
             'rules'     => 'smart_mailer_admin_rules',
             'health'    => 'smart_mailer_admin_health',
             'warmup'    => 'smart_mailer_admin_warmup',

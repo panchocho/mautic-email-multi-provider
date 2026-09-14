@@ -81,6 +81,16 @@ return [
                 'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\CampaignRoutingAdminController::class.'::save',
                 'method'     => 'POST',
             ],
+            'smart_mailer_admin_campaign_overrides' => [
+                'path'       => '/admin/smart-mailer/campaign-overrides',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\CampaignOverridesAdminController::class,
+                'method'     => 'GET',
+            ],
+            'smart_mailer_admin_campaign_overrides_save' => [
+                'path'       => '/admin/smart-mailer/campaign-overrides/{campaignId}',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\CampaignOverridesAdminController::class.'::save',
+                'method'     => 'POST',
+            ],
             'smart_mailer_admin_profiles' => [
                 'path'       => '/admin/smart-mailer/profiles',
                 'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\ProfilesAdminController::class,
