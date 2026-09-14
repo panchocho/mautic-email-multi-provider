@@ -220,6 +220,16 @@ CREATE TABLE IF NOT EXISTS smr_setting (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB
 SQL,
             <<<'SQL'
+CREATE TABLE IF NOT EXISTS smr_email_routing (
+  email_id INT NOT NULL,
+  tracking_domain VARCHAR(255) DEFAULT NULL,
+  routing_profile VARCHAR(120) DEFAULT NULL,
+  routing_mode VARCHAR(32) DEFAULT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY(email_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB
+SQL,
+            <<<'SQL'
 CREATE TABLE IF NOT EXISTS smr_delivery_log (
   id BIGINT AUTO_INCREMENT NOT NULL,
   provider_id CHAR(36) NOT NULL,

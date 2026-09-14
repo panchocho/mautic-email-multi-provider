@@ -9,6 +9,7 @@ use Mautic\EmailBundle\Event\EmailSendEvent;
 use MauticPlugin\SmartMailerRouterBundle\Application\Delivery\RouteEmailProcessorInterface;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Messenger\Message\RouteEmailCommand;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\SmartMailerSettingsRepository;
+use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Persistence\CampaignRoutingRepository;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Mime\Address;
@@ -20,6 +21,7 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
         #[Autowire('%smart_mailer_router.default_profile%')]
         private readonly string $defaultProfile = 'default',
         private readonly ?SmartMailerSettingsRepository $settingsRepository = null,
+        private readonly ?CampaignRoutingRepository $campaignRoutingRepository = null,
     ) {
     }
 
@@ -50,6 +52,7 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
         // Mautic normally replaces contact tokens after EMAIL_PRE_SEND. The router
         // skips that mailer path, so generate and apply them before routing.
         $helper->dispatchSendEvent();
+        $campaignRouting = $this->campaignRoutingRepository?->findForEmail($event->getEmail()?->getId());
         $tokens = $helper->getTokens();
 
         $messageType = $event->isInternalSend() ? 'transactional' : 'marketing';
@@ -79,7 +82,7 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
         $senderDomain = $from === null ? null : $this->domainFromAddress($from->getAddress());
 
         $metadata = [
-            'routing_profile' => $this->defaultProfile,
+            'routing_profile' => $campaignRouting['routing_profile'] ?? $this->defaultProfile,
             'message_type' => $messageType,
             'sender_domain' => $senderDomain,
             'allowed_domains' => $senderDomain === null ? [] : [$senderDomain],
@@ -103,7 +106,7 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
                     recipient: $recipient,
                     messageType: $messageType,
                     region: 'us',
-                    routingMode: 'failover',
+                    routingMode: $campaignRouting['routing_mode'] ?? 'failover',
                     payload: $payload,
                     metadata: $metadata
                 ));

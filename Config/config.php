@@ -71,6 +71,16 @@ return [
                 'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\BindingsAdminController::class.'::delete',
                 'method'     => 'POST',
             ],
+            'smart_mailer_admin_campaign_routing' => [
+                'path'       => '/admin/smart-mailer/campaign-routing',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\CampaignRoutingAdminController::class,
+                'method'     => 'GET',
+            ],
+            'smart_mailer_admin_campaign_routing_save' => [
+                'path'       => '/admin/smart-mailer/campaign-routing/{emailId}',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\CampaignRoutingAdminController::class.'::save',
+                'method'     => 'POST',
+            ],
             'smart_mailer_admin_profiles' => [
                 'path'       => '/admin/smart-mailer/profiles',
                 'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\ProfilesAdminController::class,
