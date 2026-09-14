@@ -26,7 +26,7 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            EmailEvents::EMAIL_PRE_SEND => 'onPreSend',
+            EmailEvents::EMAIL_PRE_SEND => ['onPreSend', -255],
         ];
     }
 
@@ -36,9 +36,6 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if (!$event->isInternalSend()) {
-            return;
-        }
 
         $helper = $event->getHelper();
         if ($helper === null || !isset($helper->message)) {
@@ -55,21 +52,38 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
         $helper->dispatchSendEvent();
         $tokens = $helper->getTokens();
 
+        $messageType = $event->isInternalSend() ? 'transactional' : 'marketing';
+        $from = $this->firstAddress($helper->message->getFrom());
+        $replyTo = $this->firstAddress($helper->message->getReplyTo());
+
         $payload = [
             'subject' => $this->replaceTokens($helper->getSubject(), $tokens),
             'html' => $this->replaceTokens($helper->getBody(), $tokens),
             'text' => $this->replaceTokens($helper->getPlainText(), $tokens),
-            'message_type' => 'transactional',
+            'message_type' => $messageType,
             'source' => [
                 'bundle' => 'EmailBundle',
-                'action' => 'sendExample',
+                'action' => $event->isInternalSend() ? 'internal_send' : 'send',
             ],
         ];
+        if ($from !== null) {
+            $payload['from_email'] = $from->getAddress();
+            $payload['from_name'] = $from->getName();
+        }
+        if ($replyTo !== null) {
+            $payload['reply_to'] = $replyTo->getAddress();
+        }
+        if (($returnPath = $helper->message->getReturnPath()) !== null) {
+            $payload['return_path'] = $returnPath->getAddress();
+        }
+        $senderDomain = $from === null ? null : $this->domainFromAddress($from->getAddress());
 
         $metadata = [
             'routing_profile' => $this->defaultProfile,
-            'message_type' => 'transactional',
-            'internal_send' => true,
+            'message_type' => $messageType,
+            'sender_domain' => $senderDomain,
+            'allowed_domains' => $senderDomain === null ? [] : [$senderDomain],
+            'internal_send' => $event->isInternalSend(),
         ];
 
         foreach ($toAddresses as $toAddress) {
@@ -84,10 +98,10 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
 
             try {
                 $execution = $this->routeEmailProcessor->process(new RouteEmailCommand(
-                    requestId: uniqid('mautic-sample-', true),
+                    requestId: uniqid('mautic-', true),
                     tenantId: '',
                     recipient: $recipient,
-                    messageType: 'transactional',
+                    messageType: $messageType,
                     region: 'us',
                     routingMode: 'failover',
                     payload: $payload,
@@ -100,10 +114,32 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
                 }
             } catch (\Throwable $exception) {
                 $event->addError(sprintf('%s: %s', $recipient, $exception->getMessage()));
+
             }
         }
 
         $event->enableSkip();
+    }
+
+    /**
+     * @param Address[] $addresses
+     */
+    private function firstAddress(array $addresses): ?Address
+    {
+        foreach ($addresses as $address) {
+            if ($address instanceof Address) {
+                return $address;
+            }
+        }
+
+        return null;
+    }
+
+    private function domainFromAddress(string $address): ?string
+    {
+        $domain = strtolower(trim((string) strrchr($address, '@')));
+
+        return $domain === '' ? null : ltrim($domain, '@');
     }
 
     /**
