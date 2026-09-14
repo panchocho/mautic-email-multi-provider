@@ -48,6 +48,11 @@ final class CampaignRoutingAdminController extends AbstractAdminController
         }
 
         $trackingDomain = $this->domain((string) $request->request->get('tracking_domain', ''));
+        $trackingDomainInput = trim((string) $request->request->get('tracking_domain', ''));
+        if ($trackingDomainInput !== '' && ($trackingDomain === null || !$this->resolvesDns($trackingDomain))) {
+            return $this->redirectWithStatus('dns_error');
+        }
+
         $profile = trim((string) $request->request->get('routing_profile', ''));
         $mode = trim((string) $request->request->get('routing_mode', ''));
 
@@ -101,6 +106,7 @@ final class CampaignRoutingAdminController extends AbstractAdminController
             'saved' => 'Preferencias de envío guardadas.',
             'not_found' => 'No se encontró el email seleccionado.',
             'validation_error' => 'Revisá el perfil, el modo y el dominio de tracking.',
+            'dns_error' => 'El dominio de tracking no tiene un registro DNS A, AAAA o CNAME resolvible. Crealo o espera la propagacion antes de guardarlo.',
             'db_error' => 'No se pudieron guardar las preferencias.',
             default => null,
         };
@@ -179,4 +185,16 @@ final class CampaignRoutingAdminController extends AbstractAdminController
 
         return $domain === '' ? null : $domain;
     }
+    private function resolvesDns(string $domain): bool
+    {
+        try {
+            $records = dns_get_record($domain, DNS_A | DNS_AAAA | DNS_CNAME);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return is_array($records) && $records !== [];
+    }
+
+
 }
