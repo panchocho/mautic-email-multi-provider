@@ -135,9 +135,6 @@ final class ProfileRulesRoutingResolver
             return $plan;
         }
 
-        if ($plan->mode !== RoutingMode::DOMAIN_ROUTING && $plan->mode !== RoutingMode::MULTI_DOMAIN_ROUTING) {
-            return $plan;
-        }
 
         $domains = $this->domainsForBindingLookup($request, $plan->mode);
         if ($domains === []) {
@@ -185,6 +182,10 @@ final class ProfileRulesRoutingResolver
         }
 
         if ($matchedProviders === []) {
+            if (trim((string) ($request->metadata['sender_domain'] ?? '')) !== '') {
+                return new RoutingPlan($plan->mode, [], $plan->profileId, $plan->profileName, $plan->matchedRuleIds, $plan->providerCodesByName);
+            }
+
             return $plan;
         }
 
@@ -225,13 +226,19 @@ final class ProfileRulesRoutingResolver
         );
     }
 
-    /**
-     * @return list<string>
-     */
     private function domainsForBindingLookup(RoutingRequest $request, RoutingMode $mode): array
     {
-        $domains = [];
+        $senderDomain = strtolower(trim((string) ($request->metadata['sender_domain'] ?? '')));
+        if ($senderDomain !== '') {
+            // A Mautic message must only use providers explicitly bound to its sender domain.
+            return [$senderDomain];
+        }
 
+        if ($mode !== RoutingMode::DOMAIN_ROUTING && $mode !== RoutingMode::MULTI_DOMAIN_ROUTING) {
+            return [];
+        }
+
+        $domains = [];
         $recipientDomain = $this->extractRecipientDomain($request->recipient);
         if ($recipientDomain !== '') {
             $domains[$recipientDomain] = true;
@@ -239,20 +246,14 @@ final class ProfileRulesRoutingResolver
 
         if ($mode === RoutingMode::MULTI_DOMAIN_ROUTING) {
             foreach ((array) ($request->metadata['allowed_domains'] ?? []) as $domain) {
-                if (!is_scalar($domain)) {
-                    continue;
-                }
-
-                $normalized = strtolower(trim((string) $domain));
-                if ($normalized !== '') {
-                    $domains[$normalized] = true;
+                if (is_scalar($domain) && trim((string) $domain) !== '') {
+                    $domains[strtolower(trim((string) $domain))] = true;
                 }
             }
         }
 
         return array_keys($domains);
     }
-
     /**
      * @param list<string> $values
      */

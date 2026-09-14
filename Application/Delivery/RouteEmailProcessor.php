@@ -55,6 +55,11 @@ final class RouteEmailProcessor implements RouteEmailProcessorInterface
                 $selectedProviders[$providerName] = $profile;
             }
         }
+        if ($selectedProviders === [] && trim((string) ($command->metadata['sender_domain'] ?? '')) !== '' && $plan->providerNames === []) {
+            throw new \RuntimeException('No enabled SmartMailer provider is bound to the sender domain.');
+        }
+
+
         if ($selectedProviders === []) {
             $selectedProviders = $providers;
         }

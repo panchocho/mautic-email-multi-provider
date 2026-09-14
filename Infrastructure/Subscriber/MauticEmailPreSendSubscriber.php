@@ -52,7 +52,8 @@ final class MauticEmailPreSendSubscriber implements EventSubscriberInterface
         // Mautic normally replaces contact tokens after EMAIL_PRE_SEND. The router
         // skips that mailer path, so generate and apply them before routing.
         $helper->dispatchSendEvent();
-        $campaignRouting = $this->campaignRoutingRepository?->findForEmail($event->getEmail()?->getId());
+        $campaignRouting = $this->campaignRoutingRepository?->findForCampaignSource($event->getSource())
+            ?? $this->campaignRoutingRepository?->findForEmail($event->getEmail()?->getId());
         $tokens = $helper->getTokens();
 
         $messageType = $event->isInternalSend() ? 'transactional' : 'marketing';
