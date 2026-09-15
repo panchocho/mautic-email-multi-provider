@@ -28,7 +28,7 @@ final class ResendBounceService
     public function processWebhook(array $payload): array
     {
         $type = strtolower((string) ($payload['type'] ?? ''));
-        if (!in_array($type, ['email.bounced', 'email.suppressed'], true)) {
+        if (!in_array($type, ['email.bounced', 'email.suppressed', 'email.complained'], true)) {
             return ['processed' => 0, 'matched' => 0, 'skipped' => 0];
         }
 
@@ -41,12 +41,12 @@ final class ResendBounceService
             return ['processed' => 0, 'matched' => 0, 'skipped' => 0];
         }
 
-        $reason = trim((string) ($data['bounce']['message'] ?? $data['suppressed']['message'] ?? $data['reason'] ?? ''));
+        $reason = trim((string) ($data['bounce']['message'] ?? $data['suppressed']['message'] ?? $data['complaint']['message'] ?? $data['reason'] ?? ''));
         if ($reason === '') {
-            $reason = $type === 'email.suppressed' ? 'Resend reported a suppressed email.' : 'Resend reported an email bounce.';
+            $reason = $type === 'email.suppressed' ? 'Resend reported a suppressed email.' : ($type === 'email.complained' ? 'Resend reported a spam complaint.' : 'Resend reported an email bounce.');
         }
         $messageId = trim((string) ($data['email_id'] ?? ''));
-        $comments = 'Resend bounce'.($messageId !== '' ? ' ['.$messageId.']' : '').': '.$reason;
+        $comments = ($type === 'email.complained' ? 'Resend spam complaint' : 'Resend bounce').($messageId !== '' ? ' ['.$messageId.']' : '').': '.$reason;
 
         $result = ['processed' => 0, 'matched' => 0, 'skipped' => 0];
         foreach ($recipients as $recipient) {
@@ -124,7 +124,7 @@ final class ResendBounceService
         $baseUrl = rtrim((string) ($config['base_url'] ?? 'https://api.resend.com'), '/');
         $response = $this->httpClient->request('POST', $baseUrl.'/webhooks', [
             'headers' => ['Authorization' => 'Bearer '.$apiKey, 'Content-Type' => 'application/json'],
-            'json' => ['endpoint' => $endpoint, 'events' => ['email.bounced', 'email.suppressed']],
+            'json' => ['endpoint' => $endpoint, 'events' => ['email.bounced', 'email.suppressed', 'email.complained']],
             'timeout' => 20,
         ]);
         $body = $response->toArray(false);
@@ -222,7 +222,7 @@ final class ResendBounceService
 
                 $result['bounced']++;
                 $processed = $this->processWebhook([
-                    'type' => $status === 'suppressed' ? 'email.suppressed' : 'email.bounced',
+                    'type' => $status === 'suppressed' ? 'email.suppressed' : ($status === 'complained' ? 'email.complained' : 'email.bounced'),
                     'data' => [
                         'email_id' => (string) ($email['id'] ?? ''),
                         'to' => array_values(array_unique($matchedRecipients)),

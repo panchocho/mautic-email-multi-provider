@@ -14,7 +14,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'smart-mailer:resend:sync-bounces',
-    description: 'Query known Resend message IDs and add bounced or suppressed contacts to Mautic DNC.'
+    description: 'Query known Resend message IDs and add bounced, suppressed, or complained contacts to Mautic DNC.'
 )]
 final class ResendBounceSyncCommand extends Command
 {

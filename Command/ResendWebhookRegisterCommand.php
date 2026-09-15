@@ -14,7 +14,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'smart-mailer:resend:register-webhook',
-    description: 'Register the Mautic endpoint for Resend bounce events.'
+    description: 'Register the Mautic endpoint for Resend bounce, suppression, and complaint events.'
 )]
 final class ResendWebhookRegisterCommand extends Command
 {
