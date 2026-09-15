@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'name'        => 'Smart Mailer Router',
     'description' => 'Enterprise-grade routing and deliverability optimization for Mautic 7.x.',
-    'version'     => '0.1.4',
+    'version'     => '0.1.6',
     'author'      => 'OpenAI',
     'routes'      => [
         'public' => [
@@ -40,6 +40,16 @@ return [
                 'path'       => '/admin/smart-mailer/bindings',
                 'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\BindingsAdminController::class,
                 'method'     => 'GET',
+            ],
+            'smart_mailer_admin_domains' => [
+                'path'       => '/admin/smart-mailer/domains',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\DomainsAdminController::class,
+                'method'     => 'GET',
+            ],
+            'smart_mailer_admin_domains_save' => [
+                'path'       => '/admin/smart-mailer/domains',
+                'controller' => MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin\DomainsAdminController::class.'::save',
+                'method'     => 'POST',
             ],
             'smart_mailer_admin_provider_create' => [
                 'path'       => '/admin/smart-mailer/providers/create',

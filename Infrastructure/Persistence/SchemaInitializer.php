@@ -37,6 +37,8 @@ final class SchemaInitializer
             'smr_delivery_log',
             'smr_delivery_log_archive',
             'smr_retry_queue',
+            'smr_email_routing',
+            'smr_campaign_routing',
         ];
 
         try {
