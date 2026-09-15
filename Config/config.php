@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'name'        => 'Smart Mailer Router',
     'description' => 'Enterprise-grade routing and deliverability optimization for Mautic 7.x.',
-    'version'     => '0.1.4',
+    'version'     => '0.1.5',
     'author'      => 'OpenAI',
     'routes'      => [
         'public' => [
