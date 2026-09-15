@@ -103,9 +103,9 @@ final class CampaignRoutingAdminController extends AbstractAdminController
     private function notice(string $status): ?string
     {
         return match ($status) {
-            'saved' => 'Preferencias de envío guardadas.',
-            'not_found' => 'No se encontró el email seleccionado.',
-            'validation_error' => 'Revisá el perfil, el modo y el dominio de tracking.',
+            'saved' => 'Preferencias de envÃ­o guardadas.',
+            'not_found' => 'No se encontrÃ³ el email seleccionado.',
+            'validation_error' => 'RevisÃ¡ el perfil, el modo y el dominio de tracking.',
             'dns_error' => 'El dominio de tracking no tiene un registro DNS A, AAAA o CNAME resolvible. Crealo o espera la propagacion antes de guardarlo.',
             'db_error' => 'No se pudieron guardar las preferencias.',
             default => null,
@@ -156,7 +156,7 @@ final class CampaignRoutingAdminController extends AbstractAdminController
         }
 
         return sprintf(
-            '<h2>Routing por email</h2><div class="alert alert-info">Cada campaña de Mautic usa un email. Elegí acá el subdominio de tracking y cómo debe rutearse ese email. Dejá un campo vacío para conservar el comportamiento por defecto. El dominio de tracking debe estar en <strong>Allowed Domains</strong> y apuntar a esta instancia.</div><div style="overflow:auto"><table style="width:100%%;border-collapse:collapse"><thead><tr style="text-align:left;background:#f9fafb"><th style="padding:12px">Email</th><th style="padding:12px">Remitente</th><th style="padding:12px">Tracking y SmartMailer</th></tr></thead><tbody>%s</tbody></table></div>',
+            '<h2>Routing por email</h2><div class="alert alert-info">Cada campaÃ±a de Mautic usa un email. ElegÃ­ acÃ¡ el subdominio de tracking y cÃ³mo debe rutearse ese email. DejÃ¡ un campo vacÃ­o para conservar el comportamiento por defecto. El dominio de tracking debe estar en <strong>Allowed Domains</strong> y apuntar a esta instancia.</div><div style="overflow:auto"><table style="width:100%%;border-collapse:collapse"><thead><tr style="text-align:left;background:#f9fafb"><th style="padding:12px">Email</th><th style="padding:12px">Remitente</th><th style="padding:12px">Tracking y SmartMailer</th></tr></thead><tbody>%s</tbody></table></div>',
             $rows
         );
     }
