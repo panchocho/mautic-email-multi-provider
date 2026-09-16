@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MauticPlugin\SmartMailerRouterBundle\UI\Controller\Admin;
 
-use JsonException;
 use MauticPlugin\SmartMailerRouterBundle\Domain\ValueObject\ProviderType;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\Config\JsonExampleRegistry;
 use MauticPlugin\SmartMailerRouterBundle\Infrastructure\ProviderConfig\ProviderConfigSchemaRegistry;
@@ -114,7 +113,7 @@ final class ProvidersAdminController extends AbstractAdminController
         }
 
         try {
-            $existing = $connection->fetchAssociative('SELECT id, code FROM smr_provider WHERE id = :id', ['id' => $id]);
+            $existing = $connection->fetchAssociative('SELECT id, code, config FROM smr_provider WHERE id = :id', ['id' => $id]);
         } catch (Throwable) {
             return $this->redirectWithStatus('db_error');
         }
@@ -122,7 +121,7 @@ final class ProvidersAdminController extends AbstractAdminController
             return $this->redirectWithStatus('provider_not_found');
         }
 
-        $payload = $this->buildPayload($request);
+        $payload = $this->buildPayload($request, (string) ($existing['config'] ?? '{}'));
         if ($payload === null) {
             return $this->redirectWithStatus('validation_error', $id);
         }
@@ -219,7 +218,7 @@ final class ProvidersAdminController extends AbstractAdminController
     private function renderProvidersContent(array $providers, ?array $editProvider): string
     {
         $registry = $this->jsonExampleRegistry();
-        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Field guide</strong><br><strong>Name:</strong> visible label in routing screens. <strong>Code:</strong> unique internal key (lowercase, numbers, "_" or "-"). <strong>Type:</strong> provider engine (Brevo, Resend, SES, SMTP-only, etc). <strong>Enabled:</strong> if off, provider is excluded from routing. <strong>Weight:</strong> relative distribution in weighted modes. <strong>Priority:</strong> higher values win in priority/failover modes. <strong>Throughput limit:</strong> max emails/time window used by throttling. <strong>Cost per email:</strong> unit cost for cost-optimized routing. <strong>Reputation:</strong> manual score (0-100). <strong>Health score:</strong> current operational score (0-100). <strong>Tags:</strong> labels for rules (comma-separated). <strong>Notes:</strong> internal documentation. <strong>config_json:</strong> provider credentials/options in JSON format. Si lo dejás vacío, la UI carga un ejemplo por defecto según el tipo seleccionado. Agregá <code>transport</code> con valor <code>api</code> o <code>smtp</code> para elegir el modo de envío.</div>';
+        $fieldHelp = '<div class="alert alert-secondary mb-md"><strong>Configuración guiada.</strong> Elegí proveedor y transporte, completá los campos correspondientes y SmartMailer genera la configuración interna. Las claves existentes nunca se muestran: dejá una clave vacía para conservarla.</div>';
         $examplesHelp = sprintf(
             '<details class="mb-md"><summary><strong>JSON examples by provider (copy/paste)</strong></summary><div class="mt-sm"><p class="text-muted mb-sm">La config guardada acá se usa en el envío real cuando el adapter soporta ese provider. Cada provider puede funcionar con <code>transport: api</code> o <code>transport: smtp</code> según su esquema. Si falta una clave requerida, el alta queda rechazada.</p><p class="mb-xs"><strong>Brevo API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Brevo SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SendGrid API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SendGrid SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Amazon SES API</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>Amazon SES SMTP</strong></p><pre style="white-space:pre-wrap;">%s</pre><p class="mb-xs"><strong>SMTP only</strong></p><pre style="white-space:pre-wrap;">%s</pre></div></details>',
             $this->escape($this->prettyJsonFromRegistry($registry, ProviderType::BREVO->value)),
@@ -333,6 +332,8 @@ final class ProvidersAdminController extends AbstractAdminController
         $notes = (string) ($provider['notes'] ?? '');
         $registry = $this->jsonExampleRegistry();
         $configJson = $this->prettyJson((string) ($provider['config'] ?? '{}'));
+        $currentConfig = json_decode((string) ($provider['config'] ?? '{}'), true);
+        $currentTransport = is_array($currentConfig) && ($currentConfig['transport'] ?? '') === 'smtp' ? 'smtp' : 'api';
         if (!is_array($provider) || !array_key_exists('config', $provider) || trim((string) $provider['config']) === '' || trim((string) $provider['config']) === '{}') {
             $configJson = $registry !== null
                 ? $this->prettyJsonFromRegistry($registry, $selectedType)
@@ -356,7 +357,7 @@ final class ProvidersAdminController extends AbstractAdminController
         }
 
         return sprintf(
-            '<div><h3 style="margin:0 0 8px;">%s</h3><form method="post" action="%s" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Nombre<input name="name" value="%s" required style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Código<input name="code" value="%s" required pattern="[a-z0-9_-]{2,64}" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Tipo<select name="provider_type" data-target="smart-mailer-provider-config-json" onchange="var textarea=document.getElementById(this.dataset.target);var option=this.selectedOptions&&this.selectedOptions[0];if(textarea&&option&&option.dataset&&option.dataset.defaultConfig){textarea.value=option.dataset.defaultConfig;}" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</select></label><label style="display:flex;align-items:center;gap:8px;margin-top:24px;"><input type="checkbox" name="enabled" value="1"%s> Habilitado</label><label style="display:flex;flex-direction:column;gap:4px;">Weight<input type="number" min="1" name="weight" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Priority<input type="number" name="priority" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Throughput limit<input type="number" min="1" name="throughput_limit" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Cost per email<input type="number" min="0" step="0.000001" name="cost_per_email" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Reputation<input type="number" min="0" max="100" step="0.01" name="reputation" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Health score<input type="number" min="0" max="100" name="health_score" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">Tags (coma separada)<input name="tags" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">Notes<textarea name="notes" rows="3" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</textarea></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">config_json (objeto JSON)<textarea name="config_json" id="smart-mailer-provider-config-json" rows="8" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;">%s</textarea></label><div style="grid-column:1 / -1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">%s</button></div></form></div>',
+            '<div><h3 style="margin:0 0 8px;">%s</h3><form method="post" action="%s" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><input type="hidden" name="_token" value="%s"><label style="display:flex;flex-direction:column;gap:4px;">Nombre<input name="name" value="%s" required style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Código<input name="code" value="%s" required pattern="[a-z0-9_-]{2,64}" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Tipo<select name="provider_type" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</select></label><label style="display:flex;align-items:center;gap:8px;margin-top:24px;"><input type="checkbox" name="enabled" value="1"%s> Habilitado</label><label style="display:flex;flex-direction:column;gap:4px;">Weight<input type="number" min="1" name="weight" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Priority<input type="number" name="priority" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Throughput limit<input type="number" min="1" name="throughput_limit" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Cost per email<input type="number" min="0" step="0.000001" name="cost_per_email" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Reputation<input type="number" min="0" max="100" step="0.01" name="reputation" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;">Health score<input type="number" min="0" max="100" name="health_score" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">Tags (coma separada)<input name="tags" value="%s" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;"></label><label style="display:flex;flex-direction:column;gap:4px;grid-column:1 / -1;">Notes<textarea name="notes" rows="3" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;">%s</textarea></label><fieldset style="grid-column:1 / -1;border:1px solid #d1d5db;border-radius:6px;padding:12px;"><legend style="font-size:14px;padding:0 5px;">Conexión de envío</legend><p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Completá sólo API, SMTP o SES según el tipo elegido. Las claves vacías se conservan al editar.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label>Transporte<select name="transport" class="form-control"><option value="api"%s>API</option><option value="smtp"%s>SMTP</option></select></label><label>Remitente<input name="sender_email" type="email" class="form-control" placeholder="ventas-dominio.com"></label><label>Nombre remitente<input name="sender_name" class="form-control" placeholder="Tu marca"></label><label>API key<input name="api_key" type="password" autocomplete="new-password" class="form-control" placeholder="Nueva clave; vacío conserva la actual"></label><label>URL API<input name="base_url" type="url" class="form-control" placeholder="https://api.proveedor.com"></label><label>Dominio Mailgun<input name="mailgun_domain" class="form-control" placeholder="mg.tu-dominio.com"></label><label>SMTP host<input name="smtp_host" class="form-control" placeholder="smtp.proveedor.com"></label><label>SMTP puerto<input name="smtp_port" type="number" min="1" max="65535" value="587" class="form-control"></label><label>SMTP cifrado<select name="smtp_encryption" class="form-control"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="">Sin cifrado</option></select></label><label>SMTP usuario<input name="smtp_username" class="form-control"></label><label>SMTP clave<input name="smtp_password" type="password" autocomplete="new-password" class="form-control" placeholder="Nueva clave; vacío conserva la actual"></label><label>SES Access Key<input name="access_key_id" class="form-control"></label><label>SES Secret Key<input name="secret_access_key" type="password" autocomplete="new-password" class="form-control" placeholder="Nueva clave; vacío conserva la actual"></label><label>Región SES<input name="region" class="form-control" placeholder="us-east-1"></label></div></fieldset><div style="grid-column:1 / -1;"><button type="submit" style="border:0;background:#111827;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">%s</button></div></form></div>',
             is_array($provider) ? 'Editar proveedor' : 'Nuevo proveedor',
             $this->escape($action),
             $this->escape($this->csrfToken($tokenId)),
@@ -372,7 +373,8 @@ final class ProvidersAdminController extends AbstractAdminController
             $this->escape($healthScore),
             $this->escape($tags),
             $this->escape($notes),
-            $this->escape($configJson),
+            $currentTransport === 'api' ? ' selected' : '',
+            $currentTransport === 'smtp' ? ' selected' : '',
             $this->escape($buttonLabel)
         );
     }
@@ -380,7 +382,7 @@ final class ProvidersAdminController extends AbstractAdminController
     /**
      * @return array<string, int|string>|null
      */
-    private function buildPayload(Request $request): ?array
+    private function buildPayload(Request $request, string $existingConfigJson = '{}'): ?array
     {
         $name = trim((string) $request->request->get('name', ''));
         $code = strtolower(trim((string) $request->request->get('code', '')));
@@ -396,15 +398,7 @@ final class ProvidersAdminController extends AbstractAdminController
         ), static fn (string $tag): bool => $tag !== ''));
 
         $notes = trim((string) $request->request->get('notes', ''));
-        $configRaw = trim((string) $request->request->get('config_json', '{}'));
-        try {
-            $decodedConfig = $configRaw === '' ? [] : json_decode($configRaw, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return null;
-        }
-        if (!is_array($decodedConfig)) {
-            return null;
-        }
+        $decodedConfig = $this->providerConfigFromForm($request, $providerType->value, $existingConfigJson);
         $validatedConfig = $this->validateConfigForProviderType($providerType->value, $decodedConfig);
         if ($validatedConfig === null) {
             return null;
@@ -428,6 +422,37 @@ final class ProvidersAdminController extends AbstractAdminController
             'notes' => $notes === '' ? null : $notes,
             'config_json' => is_string($configJson) ? $configJson : '{}',
         ];
+    }
+
+    /**  array<string, mixed> */
+    private function providerConfigFromForm(Request $request, string $providerType, string $existingConfigJson): array
+    {
+        try {
+            $existing = json_decode($existingConfigJson, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            $existing = [];
+        }
+        if (!is_array($existing)) {
+            $existing = [];
+        }
+        $value = static fn (string $key): string => trim((string) $request->request->get($key, ''));
+        $keepSecret = static function (string $key) use ($value, $existing): string {
+            $submitted = $value($key);
+            return $submitted !== '' ? $submitted : (string) ($existing[$key] ?? '');
+        };
+        $keepValue = $keepSecret;
+        $config = ['transport' => $value('transport') === 'smtp' ? 'smtp' : 'api', 'sender_email' => $keepValue('sender_email'), 'sender_name' => $keepValue('sender_name')];
+        if ($config['transport'] === 'smtp') {
+            return $config + ['host' => $keepValue('smtp_host'), 'port' => (int) ($value('smtp_port') ?: 587), 'encryption' => $keepValue('smtp_encryption') ?: 'tls', 'username' => $keepValue('smtp_username'), 'password' => $keepSecret('smtp_password')];
+        }
+        if ($providerType === ProviderType::AMAZON_SES->value) {
+            return $config + ['access_key_id' => $keepValue('access_key_id'), 'secret_access_key' => $keepSecret('secret_access_key'), 'region' => $keepValue('region')];
+        }
+        $config += ['api_key' => $keepSecret('api_key'), 'base_url' => $keepValue('base_url')];
+        if ($providerType === ProviderType::MAILGUN->value) {
+            $config['domain'] = $keepValue('mailgun_domain');
+        }
+        return $config;
     }
 
     private function toInt(Request $request, string $key, int $default, int $min, ?int $max = null): int
